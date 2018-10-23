@@ -48,48 +48,57 @@ public class Trilateration {
 		this.points = list.toArray(new Vector2D[points.length]);
 	}
 	
-	public double[] calculate(double[] startPoint) {
-		
-		if(startPoint.length != 2) {
-			throw new IllegalArgumentException("Start point should have dimension 2.");
-		}
+	public double[] calculate() {
 		
 		// Jacobian
 		MultivariateJacobianFunction distancesToCurrentCenter = new MultivariateJacobianFunction() {
-		      public Pair<RealVector, RealMatrix> value(final RealVector point) {
+		    public Pair<RealVector, RealMatrix> value(final RealVector point) {
 
-		          Vector2D center = new Vector2D(point.getEntry(0), point.getEntry(1));
+		        Vector2D center = new Vector2D(point.getEntry(0), point.getEntry(1));
 
-		          RealVector value = new ArrayRealVector(points.length);
-		          RealMatrix jacobian = new Array2DRowRealMatrix(points.length, 2);
+		        RealVector value = new ArrayRealVector(points.length);
+		        RealMatrix jacobian = new Array2DRowRealMatrix(points.length, 2);
 
-		          for (int i = 0; i < points.length; ++i) {
-		              Vector2D o = points[i];
-		              double modelI = Vector2D.distance(o, center);
-		              value.setEntry(i, modelI);
-		              // derivative with respect to p0 = x center
-		              jacobian.setEntry(i, 0, (center.getX() - o.getX()) / modelI);
-		              // derivative with respect to p1 = y center
-		              jacobian.setEntry(i, 1, (center.getY() - o.getY()) / modelI);
-		          }
+		        for (int i = 0; i < points.length; ++i) {
+		            Vector2D o = points[i];
+		            double modelI = Vector2D.distance(o, center);
+		            value.setEntry(i, modelI);
+		            // derivative with respect to p0 = x center
+		            jacobian.setEntry(i, 0, (center.getX() - o.getX()) / modelI);
+		            // derivative with respect to p1 = y center
+		            jacobian.setEntry(i, 1, (center.getY() - o.getY()) / modelI);
+		        }
 
-		          return new Pair<RealVector, RealMatrix>(value, jacobian);
+		        return new Pair<RealVector, RealMatrix>(value, jacobian);
 
-		      }
-		  };
-		  // least squares problem
-		  LeastSquaresProblem problem = new LeastSquaresBuilder().
-                  start(startPoint).
-                  model(distancesToCurrentCenter).
-                  target(distances).
-                  lazyEvaluation(false).
-                  maxEvaluations(1000).
-                  maxIterations(1000).
-                  build();
-		  // optimize
-		  LeastSquaresOptimizer.Optimum optimum = new LevenbergMarquardtOptimizer().optimize(problem);
-		  double[] estPoint = new double[] {optimum.getPoint().getEntry(0), optimum.getPoint().getEntry(1)};
-		  return estPoint;
+		    }
+		};
+		
+		// calculate start point
+		// start point is the average of all reference points
+		double[] startPoint = new double[] {0, 0};
+		for (int i = 0, len = points.length; i < len; ++i) {
+			startPoint[0] += points[i].getX();
+			startPoint[1] += points[i].getY();
+		}
+		startPoint[0] /= points.length;
+		startPoint[1] /= points.length;
+		
+		// least squares problem
+		LeastSquaresProblem problem = new LeastSquaresBuilder().
+                start(startPoint).
+                model(distancesToCurrentCenter).
+                target(distances).
+                lazyEvaluation(false).
+                maxEvaluations(1000).
+                maxIterations(1000).
+                build();
+		
+		// optimize
+		LeastSquaresOptimizer.Optimum optimum = new LevenbergMarquardtOptimizer().optimize(problem);
+		double[] estPoint = new double[] {optimum.getPoint().getEntry(0), optimum.getPoint().getEntry(1)};
+		return estPoint;
+		
 	}
 	
 }
